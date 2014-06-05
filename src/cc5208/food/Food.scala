@@ -42,6 +42,8 @@ object Food {
       "oil-roasted",
       "dry-roasted",
       "dry roasted",
+      "heated",
+      "unheated",
       "without salt",
       "with salt")
   
@@ -67,7 +69,7 @@ object Food {
   
   def printDataGroups(groups: List[List[Data]]): String = {
     groups.map(g => 
-      "{" + 
+      "{\n" + 
       g.map(f => "\t" + printData(f) + "\n").reduce(_ + _) +
       "},\n"
     ).reduce(_ + _)
