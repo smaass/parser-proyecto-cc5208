@@ -17,10 +17,23 @@ object Main {
   
   def processData(db: DB) = {
     val nutrHash = Food.nutrientDefinitions(db).map(n => n.nutId -> n).toMap
-    val nutrList = nutrHash.values
+    val nutrList = nutrHash.values.toList
     
-    val eAminoacids = nutrList.filter(n => Food.essentialAminoacids contains n.description)
-    eAminoacids.foreach(a => println(a))
+    val vitamins = nutrList.filter(n => n.description contains "Vitamin")    
+    val vegetables = FoodDescription.groupByName(Food.allFromGroup(db, 1100)).filter(g => g.size > 1)
+    
+    val t0 = System.nanoTime
+    setNutrients(db, vegetables, vitamins)    
+    val dt = (System.nanoTime - t0)/1000000
+    println("Listo :D! " + dt + "ms")
+  }
+
+  def setNutrients(db: DB, foods: List[List[FoodDescription]], nutrients: List[NutrientDefinition]) = {
+    val nutrientIds = nutrients.map(v => v.nutId)
+    val nutrientsData = Food.getNutrients(db, foods.flatMap(f => f.map(s => s.id)), nutrientIds)
+    val nutrientsLists = NutrientData.groupByFoodId(nutrientsData)
+    foods.flatten.zip(nutrientsLists).foreach(f => f._1.nutrients = f._2)
+    foods
   }
   
   def prueba1(db: DB) = {
@@ -36,13 +49,13 @@ object Main {
     
     groups.foreach(f => {
       val data = Food.allFromGroup(db, f._2)
-      File(f._1 + ".txt").writeAll(Data.groupByName(data))
+      File(f._1 + ".txt").writeAll(FoodDescription.groupByName(data))
     })
     
     println("Listo :)")
   }
   
-  implicit def listOfDataListsToString(dataLists: List[List[HasName]]): String = {
+  implicit def listOfDataListsToString(dataLists: List[List[FoodDescription]]): String = {
     dataLists.map(g => 
       "{\n" + 
       g.map(f => "\t" + f + "\n").reduce(_ + _) +
