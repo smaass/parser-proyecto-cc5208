@@ -8,58 +8,60 @@ object Main {
   def main(args: Array[String]) = {
     DB.connect match {
       case Some(db) => {
+        Food.nutrientDefinitions = fetchNutrientDefinitions(db)
         processData(db)
         db.close
+        println("Listo :)")
       }
       case None => println("No se pudo conectar a la base de datos")
     }
   }
   
-  def processData(db: DB) = {
-    val nutrHash = Food.nutrientDefinitions(db).map(n => n.nutId -> n).toMap
-    val nutrList = nutrHash.values.toList
-    
-    val vitamins = nutrList.filter(n => n.description contains "Vitamin")    
-    val vegetables = FoodDescription.groupByName(Food.allFromGroup(db, 1100)).filter(g => g.size > 1)
-    
-    val t0 = System.nanoTime
-    setNutrients(db, vegetables, vitamins)    
-    val dt = (System.nanoTime - t0)/1000000
-    println("Listo :D! " + dt + "ms")
-  }
+  def fetchNutrientDefinitions(db: DB) = Food.nutrientDefinitions(db).map(n => n.nutId -> n).toMap
+  
+  def processData(db: DB) = prueba2(db)
 
-  def setNutrients(db: DB, foods: List[List[FoodDescription]], nutrients: List[NutrientDefinition]) = {
+  def setNutrients(db: DB, foods: List[FoodUnit], nutrients: List[NutrientDefinition]) = {
     val nutrientIds = nutrients.map(v => v.nutId)
-    val nutrientsData = Food.getNutrients(db, foods.flatMap(f => f.map(s => s.id)), nutrientIds)
+    val nutrientsData = Food.getNutrients(db, foods.flatMap(f => f.states.map(s => s.id)), nutrientIds)
     val nutrientsLists = NutrientData.groupByFoodId(nutrientsData)
-    foods.flatten.zip(nutrientsLists).foreach(f => f._1.nutrients = f._2)
+    foods.flatMap(f => f.states).zip(nutrientsLists).foreach(f => f._1.nutrients = f._2)
     foods
   }
   
-  def prueba1(db: DB) = {
-    
-    val groups = List(
-        Pair("vegetables", 1100),
-        Pair("legumes", 1600),
-        Pair("poultry", 500),
-        Pair("pork", 1000),
-        Pair("beef", 1300),
-        Pair("fish", 1500),
-        Pair("lambVealGame", 1700))
-    
-    groups.foreach(f => {
-      val data = Food.allFromGroup(db, f._2)
-      File(f._1 + ".txt").writeAll(FoodDescription.groupByName(data))
-    })
-    
-    println("Listo :)")
+  def time[A](f: => A): A = {
+    val t0 = System.nanoTime
+    val ret = f
+    val dt = (System.nanoTime - t0)/1000000
+    println("Computation:\n\t" + ret + "\nElapsed time: " + dt + "ms")
+    ret
   }
   
-  implicit def listOfDataListsToString(dataLists: List[List[FoodDescription]]): String = {
-    dataLists.map(g => 
-      "{\n" + 
-      g.map(f => "\t" + f + "\n").reduce(_ + _) +
-      "},\n"
-    ).reduce(_ + _)
+  val foodGroups = List(
+      Pair("Vegetables", 1100),
+      Pair("Legumes", 1600),
+      Pair("Poultry", 500),
+      Pair("Pork", 1000),
+      Pair("Beef", 1300),
+      Pair("Finfish and Shellfish", 1500),
+      Pair("Lamb, Veal and Game", 1700))
+  
+  def prueba1(db: DB) = {        
+    foodGroups.foreach(f => {
+      File(f._1 + ".txt").writeAll(FoodUnit.groupStates(Food.allFromGroup(db, f._2)))
+    })
+  }
+      
+  def prueba2(db: DB) = {
+    val vitamins = Food.nutrientDefinitions.values.filter(n => n.description contains "Vitamin").toList
+    foodGroups.take(2).foreach(g => {
+      val food = FoodUnit.groupStates(Food.allFromGroup(db, g._2)).filter(g => g.states.size > 1)
+      setNutrients(db, food, vitamins)
+      File(g._1 + " (vitamins).txt").writeAll(food)
+    })
+  }
+  
+  implicit def listOfFoodsToString(foodsList: List[FoodUnit]): String = {
+    foodsList.map(f => f.toString()).reduce(_ + _)
   }
 }

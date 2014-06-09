@@ -2,35 +2,46 @@ package cc5208.food
 
 import scala.collection.mutable.Queue
 
-abstract class Data {
-  
-  override def toString = this match {
-    case FoodDescription(id, desc) => id + ": \"" + desc + "\""
-    case NutrientDefinition(id, units, tag, desc) => id + ": \"" + desc + "\""
-  }
-}
+abstract class Data
 
-object FoodDescription {
-  
-  def groupByName(dataList: List[FoodDescription]): List[List[FoodDescription]] = {
-    val groupedData = Queue[List[FoodDescription]]()
+object FoodUnit {
+  def groupStates(dataList: List[FoodDescription]): List[FoodUnit] = {
+    val groupedData = Queue[FoodUnit]()
     val dataNames = dataList.map(f => f.name).distinct
     
-    dataNames.foreach(n => groupedData += dataList.filter(f => f.name == n).toList)
+    dataNames.foreach(n => groupedData += FoodUnit(dataList.filter(f => f.name == n).toList))
     groupedData.toList
   }
 }
-case class FoodDescription(id: Int, description: String) extends Data {
-  lazy val name = nameFromDescription
-  var nutrients: List[NutrientData] = List()
+case class FoodUnit(states: List[FoodDescription]) extends Data {
+  val name = states.head.name
   
-  def nameFromDescription: String = {
-    val separators = Food.states.map(s => description.indexOf(s)).filter(i => i > 1).sortWith(_ < _)
-    if (separators isEmpty) description else description.substring(0, separators.head)
+  override def toString = {
+    name + " {\n" +
+    states.map(f => {
+      val nutrients = f.nutrients.filter(n => n.nutrVal > 0)
+      "\t" + f.state + (
+        if (nutrients isEmpty) ""
+        else " {\n" +
+          nutrients.map(n => {
+          val nutDef = Food.nutrientDefinitions(n.nutId)
+          "\t\t" + nutDef.description + ": " + n.nutrVal + " " + nutDef.units + "\n"
+          }).reduce(_ + _) +
+        "\t}") + "\n"
+    }).reduce(_ + _) + "},\n"
   }
 }
 
-case class NutrientDefinition(nutId: Int, units: String, tagname: String, description: String) extends Data
+case class FoodDescription(id: Int, description: String) extends Data {
+  private val separators = Food.states.map(s => description.indexOf(s)).filter(i => i > 1).sortWith(_ < _)
+  val name = if (separators isEmpty) description else description.substring(0, separators.head-2)
+  val state = if (separators isEmpty) "" else description.substring(separators.head)
+  var nutrients: List[NutrientData] = List()
+}
+
+case class NutrientDefinition(nutId: Int, units: String, tagname: String, description: String) extends Data {
+  override def toString = nutId + ": \"" + description + "\""
+}
 
 object NutrientData {
   def groupByFoodId(dataList: List[NutrientData]): List[List[NutrientData]] = {

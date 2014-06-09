@@ -2,9 +2,12 @@ package cc5208.food
 
 object Food {
   
+  var nutrientDefinitions = Map[Int, NutrientDefinition]()
+  
   val states = List(
       "raw",
       "cooked",
+      "baked",
       "boiled",
       "braised",
       "broiled",
