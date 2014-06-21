@@ -37,6 +37,18 @@ case class FoodDescription(id: Int, description: String) extends Data {
   val name = if (separators isEmpty) description else description.substring(0, separators.head-2)
   val state = if (separators isEmpty) "" else description.substring(separators.head)
   var nutrients: List[NutrientData] = List()
+  
+  override def toString = {
+    val nuts = nutrients.filter(n => n.nutrVal >= 0)
+      name + (
+        if (nuts isEmpty) ""
+        else " {\n" +
+          nuts.map(n => {
+          val nutDef = Food.nutrientDefinitions(n.nutId)
+          "\t" + nutDef.description + ": " + n.nutrVal + " " + nutDef.units + "\n"
+          }).reduce(_ + _) +
+        "}") + "\n"
+  }
 }
 
 case class NutrientDefinition(nutId: Int, units: String, tagname: String, description: String) extends Data {
