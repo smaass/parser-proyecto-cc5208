@@ -80,7 +80,7 @@ object Main {
     val junk = Food.allFromGroup(db, 2100)
     val foodByBrand = junkBrands map (jb => Pair(jb, junk.filter(j => j.name.contains(jb))))
     
-    val salads = foodByBrand.map(b => Pair(b._1, b._2.filter(f => f.description.toLowerCase contains "fries")))
+    val salads = foodByBrand //.map(b => Pair(b._1, b._2.filter(f => f.description.toLowerCase contains "fries")))
     val s = salads.flatMap(p => p._2)    
     setNutrients(db, s, Food.nutrientDefinitions.values.toList)
     
@@ -92,7 +92,7 @@ object Main {
     nutrients.foreach(n => {
       if (n.nutId == lastId) {
         c += 1
-        if (c == 3) chosenNutrients += Food.nutrientDefinitions.get(n.nutId)
+        if (c == s.size) chosenNutrients += Food.nutrientDefinitions.get(n.nutId)
       }
       else {
         lastId = n.nutId
