@@ -81,7 +81,7 @@ object Main {
     val foodByBrand = junkBrands map (jb => Pair(jb, junk.filter(j => j.name.contains(jb))))
     
     val salads = foodByBrand.map(b => Pair(b._1, b._2.filter(f => f.description.toLowerCase contains "fries")))
-    val s = salads.flatMap(p => p._2)
+    val s = salads.flatMap(p => p._2)    
     setNutrients(db, s, Food.nutrientDefinitions.values.toList)
     
     val nutrients = s.flatMap(f => f.nutrients).sortWith(_.nutId < _.nutId)
@@ -99,7 +99,7 @@ object Main {
         c = 1
       }
     })
-    
+   
     val nIds = chosenNutrients.map(n => n match {
       case Some(x) => x.nutId
       case None => 0
@@ -114,15 +114,16 @@ object Main {
   }
   
   def toOKC(foodList: List[FoodDescription]): String = {
-    val names = foodList.head.nutrients.map(n => Food.nutrientDefinitions(n.nutId).description).reduce(_ + "\n" + _)
-    
-    val minMax = ""
-    
+    val names = foodList.head.nutrients.map(n => Food.nutrientDefinitions(n.nutId).description).reduce(_ + "\n" + _).replace(" ","_") +"\n"  
+    val Nvals = foodList.map(f => {      f.nutrients.map(_.nutrVal)})
+    val NvalsLists =  Nvals.transpose
+    val minMax = NvalsLists.map(f => f.min +" "+ f.max+" "+"4").reduce(_ + "\n" + _)
+    println(minMax)
     val data = foodList.map(f => {
       f.nutrients.map(_.nutrVal + " ").reduce(_ + _)
     }).reduce(_ + "\n" + _)
     
-    "93 3\n" + names + minMax + "\n" + data
+    foodList.head.nutrients.size+" "+foodList.size+"\n" + names + minMax + "\n" + data
   }
   
   implicit def listOfFoodDescToString(foodList: List[FoodDescription]): String = {
