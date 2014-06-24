@@ -20,7 +20,7 @@ object Main {
   
   def fetchNutrientDefinitions(db: DB) = Food.nutrientDefinitions(db).map(n => n.nutId -> n).toMap
   
-  def processData(db: DB) = junkFood(db)
+  def processData(db: DB) = statesComparison(db)
   
   def setNutrients(db: DB, foods: List[FoodDescription], nutrients: List[NutrientDefinition]) = {
     val nutrientIds = nutrients.map(v => v.nutId)
@@ -38,28 +38,55 @@ object Main {
     ret
   }
   
+  // (nombre, id, estados a comparar)
   val foodGroups = List(
-      Pair("Vegetables", 1100),
-      Pair("Legumes", 1600),
-      Pair("Poultry", 500),
-      Pair("Pork", 1000),
-      Pair("Beef", 1300),
-      Pair("Finfish and Shellfish", 1500),
-      Pair("Lamb, Veal and Game", 1700))
+      ("Vegetables", 1100, ("raw", "frozen")),
+      ("Legumes", 1600, ("raw", "cooked")),
+      ("Poultry", 500, ("roasted", "fried")),
+      ("Pork", 1000, ("raw", "cooked")),
+      ("Beef", 1300, ("raw", "grilled")),
+      ("Finfish and Shellfish", 1500, ("raw", "cooked"))/*,
+      ("Lamb, Veal and Game", 1700, ("", "")),
+      ("Chatarra", 2100, ("", ""))*/)
   
-  def prueba1(db: DB) = {        
+  def prueba1(db: DB) = {
     foodGroups.foreach(f => {
       File(f._1 + ".txt").writeAll(FoodUnit.groupStates(Food.allFromGroup(db, f._2)))
     })
   }
       
   def prueba2(db: DB) = {
-    val vitamins = Food.nutrientDefinitions.values.filter(n => n.description contains "Vitamin").toList
-    foodGroups.take(2).foreach(g => {
+    val allNut = Food.nutrientDefinitions.values.toList
+    
+    foodGroups.foreach(g => {
       val food = FoodUnit.groupStates(Food.allFromGroup(db, g._2)).filter(g => g.states.size > 1)
-      setNutrients(db, food.flatMap(f => f.states), vitamins)
+      setNutrients(db, food.flatMap(f => f.states), allNut)
       File(g._1 + " (vitamins).txt").writeAll(food)
     })
+  }
+  
+  def compareStatesNutrients(db: DB, foodGroup: Tuple3[String, Int, Pair[String, String]]) = {
+    val allNutrients = Food.nutrientDefinitions.values.toList
+    val statesToCompare = foodGroup._3
+    val food = FoodUnit.groupStates(Food.allFromGroup(db, 1100)).filter(g => g.states.size > 1)
+    food.foreach(f => f.cleanStates(statesToCompare))
+    val filteredFood = food.filter(f => f.states.size > 1)
+    setNutrients(db, filteredFood.flatMap(f => f.states), allNutrients)
+    intersectNutrients(filteredFood.flatMap(_.states))
+    
+    val variations = filteredFood.map(f => f.porcentualVariation)
+    
+    val str =  filteredFood.head.states.head.nutrients.map(x =>
+      			Food.nutrientDefinitions(x.nutId).description).reduce(_ + ";" + _) + "\n" +
+    		variations.map(f => f.map(_.toString).reduce(_ + ";" + _)).reduce(_ + "\n" + _)
+    
+    val filename = foodGroup._1 + "(" + statesToCompare._1 + " vs " + statesToCompare._2 + ").txt";
+    File(filename).writeAll(str);
+    println("Generado: " + filename)
+  }
+  
+  def statesComparison(db: DB) = {
+    foodGroups.foreach(g => compareStatesNutrients(db, g))
   }
   
   val junkBrands = List(
@@ -75,16 +102,10 @@ object Main {
   def prueba3(db: DB) = {
     Food.nutrientDefinitions.values.foreach(n => println(n.description))
   }
-      
-  def junkFood(db: DB) = {
-    val junk = Food.allFromGroup(db, 2100)
-    val foodByBrand = junkBrands map (jb => Pair(jb, junk.filter(j => j.name.contains(jb))))
-    
-    val salads = foodByBrand //.map(b => Pair(b._1, b._2.filter(f => f.description.toLowerCase contains "fries")))
-    val s = salads.flatMap(p => p._2)    
-    setNutrients(db, s, Food.nutrientDefinitions.values.toList)
-    
-    val nutrients = s.flatMap(f => f.nutrients).sortWith(_.nutId < _.nutId)
+  
+  // 
+  def intersectNutrients(foods: List[FoodDescription]) = {
+    val nutrients = foods.flatMap(f => f.nutrients).sortWith(_.nutId < _.nutId)
     
     var c = 0
     var lastId = 0
@@ -92,7 +113,7 @@ object Main {
     nutrients.foreach(n => {
       if (n.nutId == lastId) {
         c += 1
-        if (c == s.size) chosenNutrients += Food.nutrientDefinitions.get(n.nutId)
+        if (c == foods.size) chosenNutrients += Food.nutrientDefinitions.get(n.nutId)
       }
       else {
         lastId = n.nutId
@@ -105,7 +126,18 @@ object Main {
       case None => 0
     })
     
-    s.foreach(f => f.nutrients = f.nutrients.filter(n => nIds contains n.nutId))
+    foods.foreach(f => f.nutrients = f.nutrients.filter(n => nIds contains n.nutId))
+  }
+      
+  def junkFood(db: DB) = {
+    val junk = Food.allFromGroup(db, 2100)
+    val foodByBrand = junkBrands map (jb => Pair(jb, junk.filter(j => j.name.contains(jb))))
+    
+    val fries = foodByBrand.map(b => Pair(b._1, b._2.filter(f => f.description.toLowerCase contains "fries")))
+    val s = fries.flatMap(p => p._2)    
+    setNutrients(db, s, Food.nutrientDefinitions.values.toList)
+    
+    intersectNutrients(s)
   
     File("fries.okc").writeAll(toOKC(s))
     /*

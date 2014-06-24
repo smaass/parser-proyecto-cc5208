@@ -13,8 +13,28 @@ object FoodUnit {
     groupedData.toList
   }
 }
-case class FoodUnit(states: List[FoodDescription]) extends Data {
+case class FoodUnit(var states: List[FoodDescription]) extends Data {
   val name = states.head.name
+  
+  def porcentualVariation: List[Float] = {
+    val l = states.map(s => s.nutrients.map(n => n.nutrVal)).transpose
+    l.map(f => ((f.head - f.last) * 100)/f.head)
+  }
+  
+  def cleanStates(statesToSelect: Pair[String, String]) = {
+    val queue = Queue[FoodDescription]()
+    
+    def selectState(name: String) = {
+      states.find(s => s.state contains name) match {
+      	case Some(x) => queue += x
+      	case None => {}
+      }
+    }
+    
+    selectState(statesToSelect._1)
+    selectState(statesToSelect._2)
+    states = queue.toList
+  }
   
   override def toString = {
     name + " {\n" +

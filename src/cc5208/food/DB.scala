@@ -10,7 +10,7 @@ import scala.util.Try
 
 object DB {
   
-  val dbURL = "jdbc:mysql://localhost/movedb"
+  val dbURL = "jdbc:mysql://localhost/food"
   val dbUser = "root"
   val dbPass = ""
   
